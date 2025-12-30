@@ -32,7 +32,7 @@ Vercel can serve this static bundle without a build step.
    ```bash
    vercel --prod --prebuilt
    ```
-   The `vercel.json` is configured for static hosting, so no additional build command is required.
+   The `vercel.json` is configured for static hosting with an SPA-style fallback (`routes` rewrite everything to `index.html`), so no additional build command is required. If you see a 404 on Vercel, redeploy after pulling the latest `vercel.json`.
 
 ## Key capabilities
 - Multi-step workflow covering property info, background values, descriptions, mapping, ecology, photos, and review/export
