@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#2d5016" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <title>Conservation Easement Baseline</title>
 </head>
 <body>
@@ -259,11 +260,11 @@
         </div>
       </div>
       <div class="export-actions">
-        <button class="primary" id="downloadJson">Download JSON</button>
-        <button id="printReport">Print / Save PDF</button>
+        <button class="primary" id="generatePdf">Generate PDF Report</button>
+        <button id="downloadJson">Download JSON</button>
         <button id="resetReport">Clear All Data</button>
       </div>
-      <p class="muted">The JSON export contains all collected data, drawings, and photos. Use your browser's print dialog to generate a PDF.</p>
+      <p class="muted">The PDF export generates a professional baseline report with all data, photos, and maps. The JSON export is for backup and data portability.</p>
     </section>
   </main>
 
@@ -272,6 +273,7 @@
     <div>Built from APPLICATION_DESCRIPTION.md requirements</div>
   </footer>
 
+  <script src="pdfGenerator.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

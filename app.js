@@ -483,6 +483,16 @@ function updateSummary() {
 }
 
 function setupReview() {
+  document.getElementById("generatePdf").addEventListener("click", async () => {
+    try {
+      const filename = await generateBaselinePDF(report);
+      alert(`PDF generated successfully: ${filename}`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Error generating PDF. Please check the console for details.');
+    }
+  });
+
   document.getElementById("downloadJson").addEventListener("click", () => {
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -491,10 +501,6 @@ function setupReview() {
     link.download = `${report.meta.reportName || "baseline-report"}.json`;
     link.click();
     URL.revokeObjectURL(url);
-  });
-
-  document.getElementById("printReport").addEventListener("click", () => {
-    window.print();
   });
 
   document.getElementById("resetReport").addEventListener("click", () => {
