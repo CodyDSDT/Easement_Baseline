@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#2d5016" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Conservation Easement Baseline</title>
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">Inland Northwest Land Conservancy</p>
+      <h1>Conservation Easement Baseline Report</h1>
+      <p class="lede">Offline-ready field application for documenting baseline conditions, mapping, and reporting.</p>
+    </div>
+    <div class="pill">PWA Prototype</div>
+  </header>
+
+  <main>
+    <section class="status-bar">
+      <div class="status-item">
+        <span class="label">Auto-save</span>
+        <span id="autosaveStatus" class="status-dot">Saved</span>
+      </div>
+      <div class="status-item">
+        <span class="label">Last modified</span>
+        <span id="lastModified">—</span>
+      </div>
+      <div class="status-item">
+        <span class="label">Photos</span>
+        <span id="photoCount">0</span>
+      </div>
+      <div class="status-item">
+        <span class="label">Shapes</span>
+        <span id="shapeCount">0</span>
+      </div>
+    </section>
+
+    <nav class="stepper" id="stepper">
+      <button data-step="welcome" class="active">Welcome</button>
+      <button data-step="property">Property Info</button>
+      <button data-step="background">Background</button>
+      <button data-step="description">Description</button>
+      <button data-step="mapping">Map & Boundaries</button>
+      <button data-step="ecology">Ecological</button>
+      <button data-step="photos">Photos</button>
+      <button data-step="review">Review & Export</button>
+    </nav>
+
+    <section class="card" data-panel="welcome">
+      <h2>Welcome</h2>
+      <p class="muted">Start a new baseline report or continue editing. All data is stored locally for offline use.</p>
+      <div class="grid two-cols">
+        <div>
+          <label>Report Name
+            <input type="text" id="reportName" placeholder="e.g., Smith Ridge CE Baseline" />
+          </label>
+        </div>
+        <div>
+          <label>Inspector / Preparer
+            <input type="text" id="preparer" placeholder="Your name" />
+          </label>
+        </div>
+      </div>
+      <button class="primary" id="startReport">Start / Continue</button>
+    </section>
+
+    <section class="card hidden" data-panel="property">
+      <h2>Step 1: Property Information</h2>
+      <div class="grid two-cols">
+        <label>Property Number
+          <input type="text" id="propertyNumber" />
+        </label>
+        <label>Property Name
+          <input type="text" id="propertyName" />
+        </label>
+        <label>County
+          <input type="text" id="county" />
+        </label>
+        <label>State
+          <input type="text" id="state" />
+        </label>
+        <label>Closing Date
+          <input type="date" id="closingDate" />
+        </label>
+        <label>Total Acreage
+          <input type="number" step="0.01" id="totalAcreage" />
+        </label>
+        <label>Easement Acreage
+          <input type="number" step="0.01" id="easementAcreage" />
+        </label>
+        <label>Reviewer
+          <input type="text" id="reviewer" />
+        </label>
+      </div>
+    </section>
+
+    <section class="card hidden" data-panel="background">
+      <h2>Step 2: Background Information</h2>
+      <label>Conservation Value Summary
+        <textarea id="conservationValues" rows="4" placeholder="Document habitat, water, connectivity, viewsheds, and other values."></textarea>
+      </label>
+      <div class="chip-group" id="valueChips"></div>
+      <div class="grid two-cols">
+        <label>Prohibited Uses
+          <textarea id="prohibitedUses" rows="3"></textarea>
+        </label>
+        <label>Permitted Uses (Reserved Rights)
+          <textarea id="permittedUses" rows="3"></textarea>
+        </label>
+      </div>
+      <label>Existing Easements / Restrictions
+        <textarea id="existingEasements" rows="3"></textarea>
+      </label>
+    </section>
+
+    <section class="card hidden" data-panel="description">
+      <h2>Step 3: Property Description</h2>
+      <div class="grid two-cols">
+        <label>General Description
+          <textarea id="generalDescription" rows="3"></textarea>
+        </label>
+        <label>Legal Description
+          <textarea id="legalDescription" rows="3" placeholder="Township/Range, etc."></textarea>
+        </label>
+        <label>Driving Directions
+          <textarea id="directions" rows="3"></textarea>
+        </label>
+        <label>Nearest Address
+          <input type="text" id="nearestAddress" />
+        </label>
+        <label>Travel Time (minutes)
+          <input type="number" id="travelTime" />
+        </label>
+        <label>Mileage
+          <input type="number" step="0.1" id="mileage" />
+        </label>
+        <label>Elevation / Topography
+          <textarea id="elevation" rows="3"></textarea>
+        </label>
+        <label>Property History & Use
+          <textarea id="history" rows="3"></textarea>
+        </label>
+        <label>Current Land Use / Development Envelope
+          <textarea id="landUse" rows="3"></textarea>
+        </label>
+        <label>Human-Made Features
+          <textarea id="humanFeatures" rows="3"></textarea>
+        </label>
+        <label>Public Benefit Documentation
+          <textarea id="publicBenefit" rows="3"></textarea>
+        </label>
+      </div>
+    </section>
+
+    <section class="card hidden" data-panel="mapping">
+      <h2>Step 4: Map & Boundaries</h2>
+      <p class="muted">Draw boundaries, trails, and points directly on the canvas. Shapes are saved with your report and exportable as GeoJSON.</p>
+      <div class="map-toolbar">
+        <div class="control-group">
+          <label>Tool
+            <select id="mapTool">
+              <option value="polygon">Polygon</option>
+              <option value="polyline">Polyline</option>
+              <option value="marker">Marker</option>
+              <option value="rectangle">Rectangle</option>
+            </select>
+          </label>
+          <button id="finishShape">Finish Shape</button>
+          <button id="undoPoint">Undo Point</button>
+          <button id="clearShapes">Clear All</button>
+        </div>
+        <div class="control-group metrics">
+          <div><span class="label">Current Tool</span><span id="toolLabel">Polygon</span></div>
+          <div><span class="label">Points</span><span id="pointCount">0</span></div>
+          <div><span class="label">Measurement</span><span id="measurement">—</span></div>
+        </div>
+        <div class="control-group">
+          <button id="downloadGeojson">Download GeoJSON</button>
+          <button id="downloadMap">Save Map Image</button>
+        </div>
+      </div>
+      <canvas id="mapCanvas" width="1100" height="520" aria-label="Drawing canvas"></canvas>
+    </section>
+
+    <section class="card hidden" data-panel="ecology">
+      <h2>Step 5: Ecological Features</h2>
+      <div class="grid two-cols">
+        <label>Soils (USDA)
+          <textarea id="soils" rows="3"></textarea>
+        </label>
+        <label>Water Resources
+          <textarea id="water" rows="3"></textarea>
+        </label>
+        <label>Geologic Features
+          <textarea id="geology" rows="3"></textarea>
+        </label>
+        <label>Climate Resilience
+          <textarea id="resilience" rows="3"></textarea>
+        </label>
+        <label>Vegetation Zones
+          <textarea id="vegetation" rows="3"></textarea>
+        </label>
+        <label>Wildlife Observations
+          <textarea id="wildlife" rows="3"></textarea>
+        </label>
+      </div>
+    </section>
+
+    <section class="card hidden" data-panel="photos">
+      <h2>Step 6: Photo Documentation</h2>
+      <div class="grid two-cols">
+        <label>Photo Category
+          <select id="photoCategory">
+            <option>General</option>
+            <option>Development Envelope</option>
+            <option>Vegetation Zones</option>
+            <option>Water Resources</option>
+            <option>Wildlife</option>
+            <option>Boundaries</option>
+            <option>Human-Made Features</option>
+            <option>Other</option>
+          </select>
+        </label>
+        <label>Caption
+          <input type="text" id="photoCaption" />
+        </label>
+        <label>Attach Photo
+          <input type="file" id="photoInput" accept="image/*" />
+        </label>
+        <label>Manual Coordinates (optional)
+          <input type="text" id="photoCoords" placeholder="47.6, -117.4" />
+        </label>
+      </div>
+      <button id="captureLocation">Use Current Location</button>
+      <div class="photo-grid" id="photoGrid"></div>
+    </section>
+
+    <section class="card hidden" data-panel="review">
+      <h2>Step 7: Review & Export</h2>
+      <div class="summary-grid">
+        <div>
+          <h3>Property Overview</h3>
+          <p id="summaryProperty">—</p>
+        </div>
+        <div>
+          <h3>Background</h3>
+          <p id="summaryBackground">—</p>
+        </div>
+        <div>
+          <h3>Ecology</h3>
+          <p id="summaryEcology">—</p>
+        </div>
+        <div>
+          <h3>Totals</h3>
+          <p id="summaryTotals">—</p>
+        </div>
+      </div>
+      <div class="export-actions">
+        <button class="primary" id="downloadJson">Download JSON</button>
+        <button id="printReport">Print / Save PDF</button>
+        <button id="resetReport">Clear All Data</button>
+      </div>
+      <p class="muted">The JSON export contains all collected data, drawings, and photos. Use your browser's print dialog to generate a PDF.</p>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <div>Version 1.0.0 • Offline-first • React-inspired vanilla prototype</div>
+    <div>Built from APPLICATION_DESCRIPTION.md requirements</div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
