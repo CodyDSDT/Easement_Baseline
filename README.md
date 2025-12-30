@@ -12,6 +12,28 @@ python -m http.server 4173
 
 Then open http://localhost:4173/ in your browser.
 
+## Testing on Vercel
+Vercel can serve this static bundle without a build step.
+
+1. Install the Vercel CLI if you don’t have it:
+   ```bash
+   npm install -g vercel
+   ```
+2. From the repo root, run:
+   ```bash
+   vercel dev
+   ```
+   This starts a local Vercel dev server (usually on http://localhost:3000).
+3. To test a deployed preview, run:
+   ```bash
+   vercel --prebuilt
+   ```
+   or create a production deployment with:
+   ```bash
+   vercel --prod --prebuilt
+   ```
+   The `vercel.json` is configured for static hosting, so no additional build command is required.
+
 ## Key capabilities
 - Multi-step workflow covering property info, background values, descriptions, mapping, ecology, photos, and review/export
 - Canvas-based drawing tools (polygon, polyline, rectangle, marker) with GeoJSON and PNG export
