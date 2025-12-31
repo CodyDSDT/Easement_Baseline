@@ -927,7 +927,7 @@ function hydrateUI() {
 }
 
 function init() {
-  console.log("Conservation Easement Baseline App v1.1.0 Initializing...");
+  console.log("Conservation Easement Baseline App v1.1.1 Initializing...");
   setupStepper();
   setupWelcome();
   setupBindings();
