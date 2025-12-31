@@ -539,14 +539,14 @@ async function generateBaselinePDF(reportData) {
   // (Map section is optional and numbered separately if photos exist)
   const mapSectionNum = (reportData.photos && reportData.photos.length > 0) ? 'IV' : 'IV';
 
-  if (reportData.mapping && (reportData.mapping.shapes.length > 0 || reportData.mapping.snapshots.length > 0)) {
+  if (reportData.mapping && ((reportData.mapping.shapes && reportData.mapping.shapes.length > 0) || (reportData.mapping.snapshots && reportData.mapping.snapshots.length > 0))) {
     checkPageBreak(20);
     doc.setFontSize(16);
     doc.setFont(undefined, 'bold');
     doc.text(`${mapSectionNum}. Map & Boundaries`, margin, yPos);
     yPos += 10;
 
-    if (reportData.mapping.shapes.length > 0) {
+    if (reportData.mapping.shapes && reportData.mapping.shapes.length > 0) {
       doc.setFontSize(10);
       doc.setFont(undefined, 'normal');
       doc.text(`Total shapes drawn: ${reportData.mapping.shapes.length}`, margin, yPos);
