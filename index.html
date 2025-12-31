@@ -13,6 +13,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
   <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/togeojson/0.16.0/togeojson.min.js"></script>
   <title>Conservation Easement Baseline</title>
 </head>
 <body>
@@ -168,6 +169,26 @@
           <h2>Step 4: Map & Boundaries</h2>
           <p class="muted">Draw boundaries, trails, and points. Use the toolbar on the left side of the map.</p>
           <div id="map" class="map-interface"></div>
+          
+          <div class="map-tools-advanced" style="margin-top: 1rem; padding: 1rem; background: #f0f0f0; border: 1px solid #e0e0e0; border-radius: 4px;">
+            <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Import & Location Tools</h4>
+            <div class="grid two-cols">
+              <div>
+                <label style="font-size: 0.85rem;">Go to Coordinates
+                  <div style="display: flex; gap: 0.5rem; margin-top: 0.25rem;">
+                    <input type="text" id="manualCoords" placeholder="Lat, Lng (e.g., 47.65, -117.42)" style="font-size: 0.9rem;" />
+                    <button id="goToCoordsBtn" type="button" class="primary" style="padding: 0.4rem 0.8rem;">Go</button>
+                  </div>
+                </label>
+              </div>
+              <div>
+                <label style="font-size: 0.85rem;">Import Data (KML, GPX, GeoJSON)
+                  <input type="file" id="mapDataImport" accept=".kml,.gpx,.json,.geojson" style="margin-top: 0.25rem; font-size: 0.9rem;" />
+                </label>
+              </div>
+            </div>
+          </div>
+
           <div class="map-actions">
             <button id="downloadGeojson">Download GeoJSON</button>
             <button id="downloadMap">Save Map Snapshot</button>

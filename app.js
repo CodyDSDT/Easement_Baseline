@@ -356,10 +356,128 @@ function setupMap() {
   document.getElementById("downloadGeojson").addEventListener("click", downloadGeojson);
   document.getElementById("downloadMap").addEventListener("click", downloadMapSnapshot);
   
+  // 9. Manual Coordinates Handler
+  document.getElementById("goToCoordsBtn").addEventListener("click", () => {
+    const input = document.getElementById("manualCoords").value;
+    if (!input) return;
+    
+    // Parse "lat, lng"
+    const parts = input.split(',').map(s => parseFloat(s.trim()));
+    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+      const [lat, lng] = parts;
+      map.flyTo([lat, lng], 16);
+      L.marker([lat, lng]).addTo(map).bindPopup(`Coordinates: ${lat}, ${lng}`).openPopup();
+    } else {
+      alert("Invalid format. Please use 'Lat, Lng' (e.g., 47.65, -117.42)");
+    }
+  });
+
+  // 10. File Import Handler
+  document.getElementById("mapDataImport").addEventListener("change", handleMapImport);
+  
   // Attribute Form Handlers
   featureForm.addEventListener("submit", handleFeatureSave);
   document.getElementById("cancelFeature").addEventListener("click", closeAttributePanel);
   deleteFeatureBtn.addEventListener("click", handleDeleteFeature);
+}
+
+function handleMapImport(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const content = event.target.result;
+    const ext = file.name.split('.').pop().toLowerCase();
+    
+    let geojson = null;
+
+    try {
+      if (ext === 'json' || ext === 'geojson') {
+        geojson = JSON.parse(content);
+      } else if (ext === 'kml') {
+        const parser = new DOMParser();
+        const kml = parser.parseFromString(content, 'text/xml');
+        // toGeoJSON is global if loaded via script tag
+        if (window.toGeoJSON && window.toGeoJSON.kml) {
+          geojson = toGeoJSON.kml(kml);
+        } else {
+          alert("KML parser not ready.");
+          return;
+        }
+      } else if (ext === 'gpx') {
+        const parser = new DOMParser();
+        const gpx = parser.parseFromString(content, 'text/xml');
+        if (window.toGeoJSON && window.toGeoJSON.gpx) {
+          geojson = toGeoJSON.gpx(gpx);
+        } else {
+          alert("GPX parser not ready.");
+          return;
+        }
+      } else {
+        alert("Unsupported file format.");
+        return;
+      }
+
+      if (geojson) {
+        processImportedGeoJSON(geojson);
+      }
+    } catch (err) {
+      console.error("Import error:", err);
+      alert("Failed to parse file. Please check the format.");
+    }
+  };
+
+  reader.readAsText(file);
+  e.target.value = ""; // Reset input
+}
+
+function processImportedGeoJSON(geojson) {
+  let features = [];
+  if (geojson.type === "FeatureCollection") {
+    features = geojson.features;
+  } else if (geojson.type === "Feature") {
+    features = [geojson];
+  } else {
+    // Basic geometry support if needed, wrap in Feature
+    features = [{ type: "Feature", geometry: geojson, properties: {} }];
+  }
+
+  let addedCount = 0;
+  features.forEach(f => {
+    // Ensure properties exist
+    f.properties = f.properties || {};
+    
+    // Generate internal ID if missing
+    if (!f.properties.id) f.properties.id = crypto.randomUUID();
+    
+    // Set default label if missing
+    if (!f.properties.label) {
+      f.properties.label = f.properties.name || `Imported-${addedCount + 1}`;
+    }
+    
+    // Set default type
+    if (!f.properties.type) f.properties.type = "Imported";
+
+    f.properties.importedAt = new Date().toISOString();
+
+    report.mapping.features.push(f);
+    addedCount++;
+  });
+
+  loadMapFeatures(); // Re-render map and table
+  queueSave();
+  
+  if (addedCount > 0) {
+    alert(`Successfully imported ${addedCount} features.`);
+    // Zoom to extent of imported data
+    const bounds = L.geoJSON(geojson).getBounds();
+    if (bounds.isValid()) {
+      map.fitBounds(bounds);
+    }
+  } else {
+    alert("No valid features found in file.");
+  }
 }
 
 function loadMapFeatures() {
