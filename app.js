@@ -43,8 +43,9 @@ const defaultReport = () => ({
     publicBenefit: "",
   },
   mapping: {
-    shapes: [],
-    snapshots: [],
+    features: [], // GeoJSON Feature array
+    center: [47.658, -117.426], // Default to Spokane, WA
+    zoom: 10,
   },
   ecology: {
     soils: "",
@@ -61,25 +62,29 @@ const defaultReport = () => ({
 
 const report = loadReport();
 let autosaveTimer;
-let currentShape = { type: "polygon", points: [] };
+let map, drawnItems;
+let pendingLayer = null; // Temporarily holds a layer while attributes are being added
+let editingFeatureId = null; // ID of the feature currently being edited
 
+// DOM Elements
 const panels = document.querySelectorAll("[data-panel]");
 const stepper = document.getElementById("stepper");
 const autosaveStatus = document.getElementById("autosaveStatus");
 const lastModified = document.getElementById("lastModified");
 const photoCount = document.getElementById("photoCount");
-const shapeCount = document.getElementById("shapeCount");
-const pointCount = document.getElementById("pointCount");
-const measurement = document.getElementById("measurement");
-const toolLabel = document.getElementById("toolLabel");
-const mapCanvas = document.getElementById("mapCanvas");
-const ctx = mapCanvas.getContext("2d");
+const featureCount = document.getElementById("featureCount");
+const attributePanel = document.getElementById("attributePanel");
+const featureForm = document.getElementById("featureForm");
+const deleteFeatureBtn = document.getElementById("deleteFeature");
 
 function loadReport() {
   const saved = localStorage.getItem(STORAGE_KEY);
   if (!saved) return defaultReport();
   try {
-    return JSON.parse(saved);
+    const parsed = JSON.parse(saved);
+    // Migration: Ensure mapping.features exists if loading old data
+    if (!parsed.mapping.features) parsed.mapping.features = [];
+    return parsed;
   } catch (err) {
     console.warn("Failed to parse saved report, resetting.");
     return defaultReport();
@@ -141,6 +146,16 @@ function showPanel(step) {
   stepper.querySelectorAll("button").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.step === step);
   });
+  
+  // Invalidate map size when showing the map panel to ensure it renders correctly
+  if (step === 'mapping' && map) {
+    // Immediate call
+    map.invalidateSize();
+    // Delayed call to handle transition animations
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 200);
+  }
 }
 
 function setupStepper() {
@@ -199,209 +214,332 @@ function setupBindings() {
 
 function updateCounters() {
   photoCount.textContent = report.photos.length;
-  shapeCount.textContent = report.mapping.shapes.length;
+  featureCount.textContent = report.mapping.features.length;
   lastModified.textContent = new Date(report.lastModified).toLocaleString();
 }
 
+// ----------------------------------------------------------------------------
+// MAPPING LOGIC (LEAFLET + LEAFLET-DRAW)
+// ----------------------------------------------------------------------------
+
 function setupMap() {
-  toolLabel.textContent = currentShape.type;
-  document.getElementById("mapTool").addEventListener("change", (e) => {
-    currentShape = { type: e.target.value, points: [] };
-    toolLabel.textContent = currentShape.type;
-    pointCount.textContent = "0";
-    measurement.textContent = "—";
-    redraw();
+  // 1. Initialize Map
+  // Use user's saved center/zoom if available, else default
+  const startCenter = report.mapping.center || [47.658, -117.426];
+  const startZoom = report.mapping.zoom || 10;
+  
+  map = L.map('map').setView(startCenter, startZoom);
+
+  // 2. Add Base Layers
+  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
   });
 
-  mapCanvas.addEventListener("click", (e) => {
-    const rect = mapCanvas.getBoundingClientRect();
-    const point = [e.clientX - rect.left, e.clientY - rect.top];
-    if (currentShape.type === "marker") {
-      currentShape.points = [point];
-      finishShape();
-      return;
+  const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri'
+  });
+
+  // Default to satellite for field work
+  sat.addTo(map);
+
+  const baseMaps = {
+      "Satellite": sat,
+      "Street Map": osm
+  };
+  L.control.layers(baseMaps).addTo(map);
+
+  // 3. Setup Feature Group for Drawn Items
+  drawnItems = new L.FeatureGroup();
+  map.addLayer(drawnItems);
+
+  // 4. Initialize Draw Control
+  const drawControl = new L.Control.Draw({
+      draw: {
+          polygon: { allowIntersection: false },
+          polyline: true,
+          marker: true,
+          circle: false, // Not standard for GeoJSON
+          circlemarker: false,
+          rectangle: true
+      },
+      edit: {
+          featureGroup: drawnItems,
+          remove: false, // We handle removal via custom UI
+          edit: false    // We handle edit via custom UI
+      }
+  });
+  map.addControl(drawControl);
+
+  // 5. Handle "Created" Event
+  map.on(L.Draw.Event.CREATED, function (e) {
+      const type = e.layerType;
+      const layer = e.layer;
+
+      // Temporary hold
+      pendingLayer = layer;
+      
+      // Open Attribute Panel to Add Details
+      openAttributePanel('new');
+  });
+
+  // 6. Add Geocoder (Search) Control
+  if (L.Control.Geocoder) {
+    L.Control.geocoder({
+      defaultMarkGeocode: false
+    })
+    .on('markgeocode', function(e) {
+      const bbox = e.geocode.bbox;
+      const poly = L.polygon([
+        bbox.getSouthEast(),
+        bbox.getNorthEast(),
+        bbox.getNorthWest(),
+        bbox.getSouthWest()
+      ]);
+      map.fitBounds(poly.getBounds());
+    })
+    .addTo(map);
+  }
+
+  // 7. Add Custom "Locate Me" Control
+  const LocateControl = L.Control.extend({
+    options: { position: 'topleft' },
+    onAdd: function(map) {
+      const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-locate');
+      container.title = "Show my location";
+      
+      const icon = L.DomUtil.create('span', 'leaflet-control-locate-icon', container);
+      icon.innerHTML = '📍'; 
+      icon.style.cursor = 'pointer';
+
+      container.onclick = function() {
+        if (!navigator.geolocation) {
+          alert("Geolocation is not supported by this browser.");
+          return;
+        }
+        container.style.backgroundColor = '#ddd'; // Visual feedback
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const { latitude, longitude } = pos.coords;
+            const accuracy = pos.coords.accuracy;
+            map.flyTo([latitude, longitude], 16);
+            
+            // Optional: Show accuracy circle
+            L.circle([latitude, longitude], { radius: accuracy, color: '#136AEC', weight: 1, fillOpacity: 0.1 }).addTo(map);
+            L.circleMarker([latitude, longitude], { radius: 6, color: 'white', fillColor: '#136AEC', fillOpacity: 1 }).addTo(map);
+            
+            container.style.backgroundColor = 'white';
+          },
+          (err) => {
+            alert(`Location error: ${err.message}`);
+            container.style.backgroundColor = 'white';
+          },
+          { enableHighAccuracy: true }
+        );
+      };
+      return container;
     }
-    currentShape.points.push(point);
-    pointCount.textContent = String(currentShape.points.length);
-    measurement.textContent = formatMeasurement(currentShape.type, currentShape.points);
-    redraw();
+  });
+  map.addControl(new LocateControl());
+
+  // 8. Load Existing Features
+  loadMapFeatures();
+
+  // 9. Save map position on move
+  map.on('moveend', () => {
+    report.mapping.center = [map.getCenter().lat, map.getCenter().lng];
+    report.mapping.zoom = map.getZoom();
+    // Debounce save? Optional. For now just updating state object is enough.
   });
 
-  document.getElementById("undoPoint").addEventListener("click", () => {
-    currentShape.points.pop();
-    pointCount.textContent = String(currentShape.points.length);
-    measurement.textContent = formatMeasurement(currentShape.type, currentShape.points);
-    redraw();
-  });
-
-  document.getElementById("finishShape").addEventListener("click", finishShape);
-  document.getElementById("clearShapes").addEventListener("click", () => {
-    if (!confirm("Remove all shapes?")) return;
-    report.mapping.shapes = [];
-    currentShape.points = [];
-    redraw();
-    queueSave();
-  });
-
+  // 8. Bind Buttons
   document.getElementById("downloadGeojson").addEventListener("click", downloadGeojson);
-  document.getElementById("downloadMap").addEventListener("click", downloadMapImage);
-
-  redraw();
+  document.getElementById("downloadMap").addEventListener("click", downloadMapSnapshot);
+  
+  // Attribute Form Handlers
+  featureForm.addEventListener("submit", handleFeatureSave);
+  document.getElementById("cancelFeature").addEventListener("click", closeAttributePanel);
+  deleteFeatureBtn.addEventListener("click", handleDeleteFeature);
 }
 
-function finishShape() {
-  if (currentShape.type === "rectangle" && currentShape.points.length >= 2) {
-    const [p1, p2] = currentShape.points;
-    const rectPoints = [p1, [p2[0], p1[1]], p2, [p1[0], p2[1]]];
-    report.mapping.shapes.push({ type: "polygon", points: rectPoints });
-  } else if (currentShape.type === "polygon" && currentShape.points.length >= 3) {
-    report.mapping.shapes.push({ type: "polygon", points: [...currentShape.points] });
-  } else if (currentShape.type === "polyline" && currentShape.points.length >= 2) {
-    report.mapping.shapes.push({ type: "polyline", points: [...currentShape.points] });
-  } else if (currentShape.type === "marker" && currentShape.points.length) {
-    report.mapping.shapes.push({ type: "marker", points: [...currentShape.points] });
+function loadMapFeatures() {
+  drawnItems.clearLayers();
+  
+  if (!report.mapping.features) return;
+
+  // Convert GeoJSON to Leaflet layers
+  L.geoJSON(report.mapping.features, {
+    onEachFeature: function (feature, layer) {
+      // Bind click to edit
+      layer.on('click', () => {
+        pendingLayer = layer;
+        editingFeatureId = feature.properties.id; // Assume ID exists
+        openAttributePanel('edit', feature.properties);
+      });
+      drawnItems.addLayer(layer);
+    },
+    pointToLayer: function (feature, latlng) {
+      return L.marker(latlng);
+    }
+  });
+
+  renderFeatureTable();
+}
+
+function openAttributePanel(mode, properties = {}) {
+  attributePanel.classList.remove("hidden");
+  
+  // Reset Form
+  featureForm.reset();
+  
+  if (mode === 'new') {
+    document.getElementById("featLabel").value = generateDefaultLabel();
+    deleteFeatureBtn.classList.add("hidden");
+    editingFeatureId = null;
   } else {
-    return;
+    // Edit Mode
+    document.getElementById("featLabel").value = properties.label || "";
+    document.getElementById("featType").value = properties.type || "Other";
+    document.getElementById("featDesc").value = properties.description || "";
+    deleteFeatureBtn.classList.remove("hidden");
   }
-  currentShape.points = [];
-  pointCount.textContent = "0";
-  measurement.textContent = "—";
-  redraw();
-  queueSave();
 }
 
-function redraw() {
-  ctx.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
-  ctx.fillStyle = "#f8faf5";
-  ctx.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
-
-  report.mapping.shapes.forEach((shape) => drawShape(shape, "#2d5016"));
-  if (currentShape.points.length) {
-    drawShape(currentShape, "#8c2f39", true);
-  }
-  shapeCount.textContent = report.mapping.shapes.length;
+function closeAttributePanel() {
+  attributePanel.classList.add("hidden");
+  pendingLayer = null;
+  editingFeatureId = null;
+  
+  // If we were adding a new layer and canceled, remove it (it wasn't added to drawnItems yet if new, 
+  // but if it was a draw event, we just discard the pendingLayer ref. 
+  // If it was an edit, we just close.)
 }
 
-function drawShape(shape, color, dashed = false) {
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.setLineDash(dashed ? [6, 6] : []);
-  if (shape.type === "marker") {
-    const [x, y] = shape.points[0];
-    ctx.beginPath();
-    ctx.arc(x, y, 6, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.fill();
-    return;
-  }
-  ctx.beginPath();
-  shape.points.forEach(([x, y], idx) => {
-    if (idx === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-  if (shape.type === "polygon") ctx.closePath();
-  ctx.stroke();
-  ctx.setLineDash([]);
-}
-
-function formatMeasurement(type, pts) {
-  if (!pts.length) return "—";
-  if (type === "marker") return "Single point";
-  if (type === "polyline" && pts.length >= 2) {
-    const length = lineLength(pts);
-    return describeDistance(length);
-  }
-  if (type === "polygon" && pts.length >= 3) {
-    const area = polygonArea(pts);
-    return describeArea(area);
-  }
-  if (type === "rectangle" && pts.length >= 2) {
-    const [p1, p2] = pts;
-    const width = Math.abs(p2[0] - p1[0]);
-    const height = Math.abs(p2[1] - p1[1]);
-    const area = width * height;
-    return describeArea(area);
-  }
-  return "—";
-}
-
-function lineLength(points) {
-  let total = 0;
-  for (let i = 1; i < points.length; i += 1) {
-    const [x1, y1] = points[i - 1];
-    const [x2, y2] = points[i];
-    total += Math.hypot(x2 - x1, y2 - y1);
-  }
-  return total;
-}
-
-function polygonArea(points) {
-  let area = 0;
-  for (let i = 0; i < points.length; i += 1) {
-    const [x1, y1] = points[i];
-    const [x2, y2] = points[(i + 1) % points.length];
-    area += x1 * y2 - x2 * y1;
-  }
-  return Math.abs(area / 2);
-}
-
-function describeDistance(lengthPx) {
-  const feet = lengthPx; // 1px = 1ft placeholder for offline canvas
-  if (feet >= 5280) return `${(feet / 5280).toFixed(2)} miles`;
-  return `${feet.toFixed(1)} ft`;
-}
-
-function describeArea(areaPx) {
-  const sqFt = areaPx; // 1px² = 1 sq ft placeholder
-  if (sqFt >= 43560) return `${(sqFt / 43560).toFixed(2)} acres`;
-  return `${sqFt.toFixed(1)} sq ft`;
-}
-
-function toGeoJSON() {
-  const features = report.mapping.shapes.map((shape) => {
-    if (shape.type === "marker") {
-      const [[x, y]] = shape.points;
-      return {
-        type: "Feature",
-        geometry: { type: "Point", coordinates: [x, y] },
-        properties: { tool: shape.type },
+function handleFeatureSave(e) {
+  e.preventDefault();
+  
+  const label = document.getElementById("featLabel").value;
+  const type = document.getElementById("featType").value;
+  const desc = document.getElementById("featDesc").value;
+  
+  if (editingFeatureId) {
+    // EDIT EXISTING
+    // Update properties in report
+    const featureIndex = report.mapping.features.findIndex(f => f.properties.id === editingFeatureId);
+    if (featureIndex !== -1) {
+      report.mapping.features[featureIndex].properties = {
+        ...report.mapping.features[featureIndex].properties,
+        label,
+        type,
+        description: desc,
+        updatedAt: new Date().toISOString()
       };
     }
-    if (shape.type === "polyline") {
-      return {
-        type: "Feature",
-        geometry: { type: "LineString", coordinates: shape.points },
-        properties: { tool: shape.type },
-      };
-    }
-    const coords = [...shape.points];
-    coords.push(shape.points[0]);
-    return {
-      type: "Feature",
-      geometry: { type: "Polygon", coordinates: [coords] },
-      properties: { tool: shape.type },
+    // Reload map to reflect changes (simple way)
+    loadMapFeatures();
+  } else {
+    // NEW FEATURE
+    if (!pendingLayer) return;
+
+    // Convert to GeoJSON
+    const geojson = pendingLayer.toGeoJSON();
+    
+    // Add Properties
+    geojson.properties = {
+      id: crypto.randomUUID(), // Unique ID
+      label,
+      type,
+      description: desc,
+      createdAt: new Date().toISOString()
     };
-  });
-  return { type: "FeatureCollection", features };
+    
+    // Add to Report
+    report.mapping.features.push(geojson);
+    
+    // Add to Map LayerGroup
+    // We re-load from state to ensure consistency
+    loadMapFeatures();
+  }
+
+  queueSave();
+  closeAttributePanel();
 }
+
+function handleDeleteFeature() {
+  if (!editingFeatureId) return;
+  if (!confirm("Are you sure you want to delete this feature?")) return;
+
+  report.mapping.features = report.mapping.features.filter(f => f.properties.id !== editingFeatureId);
+  
+  loadMapFeatures();
+  queueSave();
+  closeAttributePanel();
+}
+
+function generateDefaultLabel() {
+  const type = document.getElementById("featType").value || "Feature";
+  const count = report.mapping.features.length + 1;
+  return `${type}-${count}`;
+}
+
+function renderFeatureTable() {
+  const tbody = document.querySelector("#featuresTable tbody");
+  tbody.innerHTML = "";
+
+  if (report.mapping.features.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="muted">No features mapped yet.</td></tr>';
+    return;
+  }
+
+  report.mapping.features.forEach(feature => {
+    const props = feature.properties;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${props.label}</td>
+      <td>${props.type}</td>
+      <td>${props.description || "—"}</td>
+      <td>
+        <button class="action-btn" onclick="editFeature('${props.id}')">Edit</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// Global scope for onclick handler
+window.editFeature = function(id) {
+  const feature = report.mapping.features.find(f => f.properties.id === id);
+  if (feature) {
+    pendingLayer = null; // Not relevant for direct edit
+    editingFeatureId = id;
+    openAttributePanel('edit', feature.properties);
+  }
+};
 
 function downloadGeojson() {
-  const blob = new Blob([JSON.stringify(toGeoJSON(), null, 2)], { type: "application/json" });
+  const collection = {
+    type: "FeatureCollection",
+    features: report.mapping.features
+  };
+  const blob = new Blob([JSON.stringify(collection, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${report.meta.reportName || "baseline"}-shapes.geojson`;
+  link.download = `${report.meta.reportName || "baseline"}-features.geojson`;
   link.click();
   URL.revokeObjectURL(url);
 }
 
-function downloadMapImage() {
-  const url = mapCanvas.toDataURL("image/png");
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${report.meta.reportName || "baseline"}-map.png`;
-  link.click();
+function downloadMapSnapshot() {
+  // Leaflet-image or html2canvas is typically needed for this.
+  // For this prototype, we'll try basic html2canvas on the map container
+  // Note: This might have issues with cross-origin tiles (CORS).
+  alert("Map snapshot functionality requires additional library setup for CORS handling. Please use system screenshot for now.");
 }
+
+// ----------------------------------------------------------------------------
+// END MAPPING LOGIC
+// ----------------------------------------------------------------------------
 
 function setupPhotos() {
   const photoInput = document.getElementById("photoInput");
@@ -480,7 +618,7 @@ function updateSummary() {
   summaryProperty.textContent = `${report.property.propertyName || "Unnamed"} • ${report.property.county || ""} ${report.property.state || ""}`.trim();
   summaryBackground.textContent = report.background.conservationValues || "Add conservation value notes.";
   summaryEcology.textContent = report.ecology.vegetation || report.ecology.wildlife || "Add ecological observations.";
-  summaryTotals.textContent = `${report.photos.length} photos • ${report.mapping.shapes.length} shapes`;
+  summaryTotals.textContent = `${report.photos.length} photos • ${report.mapping.features.length} features`;
 }
 
 function setupReview() {
@@ -518,7 +656,6 @@ function setupSpeciesLibrary() {
   const searchResults = document.getElementById("speciesSearchResults");
   const selectedTable = document.getElementById("selectedSpeciesTable");
 
-  // Initialize selected species array if not present (for backward compatibility)
   if (!report.ecology.selectedSpecies) {
     report.ecology.selectedSpecies = [];
   }
@@ -569,7 +706,6 @@ function setupSpeciesLibrary() {
       });
 
       item.addEventListener("click", () => {
-        // Check if already selected
         const alreadySelected = report.ecology.selectedSpecies.some((s) => s.id === species.id);
         if (alreadySelected) {
           alert(`${species.commonName} is already in your selected species list.`);
@@ -594,7 +730,6 @@ function setupSpeciesLibrary() {
       return;
     }
 
-    // Group species by category
     const groups = {};
     report.ecology.selectedSpecies.forEach((species) => {
       if (!groups[species.group]) {
@@ -605,7 +740,6 @@ function setupSpeciesLibrary() {
 
     let html = "";
 
-    // Create tables for each group
     Object.keys(groups)
       .sort()
       .forEach((groupName) => {
@@ -645,7 +779,6 @@ function setupSpeciesLibrary() {
 
     selectedTable.innerHTML = html;
 
-    // Attach remove handlers
     selectedTable.querySelectorAll(".remove-species").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const speciesId = e.target.dataset.speciesId;
@@ -659,7 +792,6 @@ function setupSpeciesLibrary() {
   searchInput.addEventListener("input", filterSpecies);
   groupFilter.addEventListener("change", filterSpecies);
 
-  // Initial render
   renderSelectedSpecies();
 }
 
@@ -677,6 +809,7 @@ function hydrateUI() {
 }
 
 function init() {
+  console.log("Conservation Easement Baseline App v1.1.0 Initializing...");
   setupStepper();
   setupWelcome();
   setupBindings();

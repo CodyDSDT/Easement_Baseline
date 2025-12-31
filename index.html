@@ -6,7 +6,13 @@
   <meta name="theme-color" content="#2d5016" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
   <title>Conservation Easement Baseline</title>
 </head>
 <body>
@@ -34,8 +40,8 @@
         <span id="photoCount">0</span>
       </div>
       <div class="status-item">
-        <span class="label">Shapes</span>
-        <span id="shapeCount">0</span>
+        <span class="label">Features</span>
+        <span id="featureCount">0</span>
       </div>
     </section>
 
@@ -157,33 +163,64 @@
     </section>
 
     <section class="card hidden" data-panel="mapping">
-      <h2>Step 4: Map & Boundaries</h2>
-      <p class="muted">Draw boundaries, trails, and points directly on the canvas. Shapes are saved with your report and exportable as GeoJSON.</p>
-      <div class="map-toolbar">
-        <div class="control-group">
-          <label>Tool
-            <select id="mapTool">
-              <option value="polygon">Polygon</option>
-              <option value="polyline">Polyline</option>
-              <option value="marker">Marker</option>
-              <option value="rectangle">Rectangle</option>
-            </select>
-          </label>
-          <button id="finishShape">Finish Shape</button>
-          <button id="undoPoint">Undo Point</button>
-          <button id="clearShapes">Clear All</button>
+      <div class="map-container-wrapper">
+        <div class="map-main">
+          <h2>Step 4: Map & Boundaries</h2>
+          <p class="muted">Draw boundaries, trails, and points. Use the toolbar on the left side of the map.</p>
+          <div id="map" class="map-interface"></div>
+          <div class="map-actions">
+            <button id="downloadGeojson">Download GeoJSON</button>
+            <button id="downloadMap">Save Map Snapshot</button>
+          </div>
         </div>
-        <div class="control-group metrics">
-          <div><span class="label">Current Tool</span><span id="toolLabel">Polygon</span></div>
-          <div><span class="label">Points</span><span id="pointCount">0</span></div>
-          <div><span class="label">Measurement</span><span id="measurement">—</span></div>
-        </div>
-        <div class="control-group">
-          <button id="downloadGeojson">Download GeoJSON</button>
-          <button id="downloadMap">Save Map Image</button>
+
+        <!-- Attribute Panel (Hidden by default) -->
+        <div id="attributePanel" class="attribute-panel hidden">
+          <h3>Feature Attributes</h3>
+          <form id="featureForm">
+            <label>Label
+              <input type="text" id="featLabel" placeholder="e.g., PP-01, North Boundary" required />
+            </label>
+            <label>Feature Type
+              <select id="featType">
+                <option value="Boundary">Property Boundary</option>
+                <option value="Photopoint">Photopoint</option>
+                <option value="Road">Road</option>
+                <option value="Trail">Trail</option>
+                <option value="Water">Water Resource</option>
+                <option value="Structure">Human-Made Structure</option>
+                <option value="Vegetation">Vegetation Zone</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
+            <label>Description / Notes
+              <textarea id="featDesc" rows="3"></textarea>
+            </label>
+            <div class="panel-actions">
+              <button type="submit" class="primary">Save Feature</button>
+              <button type="button" id="cancelFeature">Cancel</button>
+              <button type="button" id="deleteFeature" class="danger hidden">Delete</button>
+            </div>
+          </form>
         </div>
       </div>
-      <canvas id="mapCanvas" width="1100" height="520" aria-label="Drawing canvas"></canvas>
+
+      <h3 style="margin-top: 2rem;">Mapped Features</h3>
+      <div class="table-container">
+        <table id="featuresTable" class="data-table">
+          <thead>
+            <tr>
+              <th>Label</th>
+              <th>Type</th>
+              <th>Description</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="4" class="muted">No features mapped yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
     </section>
 
     <section class="card hidden" data-panel="ecology">
@@ -295,12 +332,12 @@
   </main>
 
   <footer class="app-footer">
-    <div>Version 1.0.0 • Offline-first • React-inspired vanilla prototype</div>
+    <div>Version 1.1.0 • Offline-first • React-inspired vanilla prototype</div>
     <div>Built from APPLICATION_DESCRIPTION.md requirements</div>
   </footer>
 
-  <script src="speciesLibrary.js"></script>
-  <script src="pdfGenerator.js"></script>
-  <script src="app.js"></script>
+  <script src="speciesLibrary.js?v=1.1.0"></script>
+  <script src="pdfGenerator.js?v=1.1.0"></script>
+  <script src="app.js?v=1.1.0"></script>
 </body>
 </html>
