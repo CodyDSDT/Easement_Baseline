@@ -53,6 +53,7 @@ const defaultReport = () => ({
     resilience: "",
     vegetation: "",
     wildlife: "",
+    selectedSpecies: [],
   },
   photos: [],
   lastModified: new Date().toISOString(),
@@ -511,6 +512,157 @@ function setupReview() {
   });
 }
 
+function setupSpeciesLibrary() {
+  const searchInput = document.getElementById("speciesSearch");
+  const groupFilter = document.getElementById("speciesGroupFilter");
+  const searchResults = document.getElementById("speciesSearchResults");
+  const selectedTable = document.getElementById("selectedSpeciesTable");
+
+  // Initialize selected species array if not present (for backward compatibility)
+  if (!report.ecology.selectedSpecies) {
+    report.ecology.selectedSpecies = [];
+  }
+
+  function filterSpecies() {
+    const searchTerm = searchInput.value.toLowerCase().trim();
+    const selectedGroup = groupFilter.value;
+
+    if (!searchTerm && !selectedGroup) {
+      searchResults.style.display = "none";
+      return;
+    }
+
+    const filtered = SPECIES_LIBRARY.filter((species) => {
+      const matchesSearch =
+        !searchTerm ||
+        species.commonName.toLowerCase().includes(searchTerm) ||
+        species.scientificName.toLowerCase().includes(searchTerm);
+      const matchesGroup = !selectedGroup || species.group === selectedGroup;
+      return matchesSearch && matchesGroup;
+    });
+
+    if (filtered.length === 0) {
+      searchResults.innerHTML = '<div style="padding: 10px; color: #999;">No species found</div>';
+      searchResults.style.display = "block";
+      return;
+    }
+
+    searchResults.innerHTML = "";
+    searchResults.style.display = "block";
+
+    filtered.forEach((species) => {
+      const item = document.createElement("div");
+      item.style.cssText = "padding: 10px; cursor: pointer; border-bottom: 1px solid #eee;";
+      item.innerHTML = `
+        <strong>${species.commonName}</strong> <em style="color: #666;">${species.scientificName}</em>
+        <br />
+        <span style="font-size: 0.85em; color: #2d5016;">${species.group}</span>
+        ${species.invasive ? ' <span style="color: #8c2f39; font-weight: bold;">⚠ INVASIVE</span>' : ""}
+      `;
+
+      item.addEventListener("mouseenter", () => {
+        item.style.backgroundColor = "#f0f0f0";
+      });
+
+      item.addEventListener("mouseleave", () => {
+        item.style.backgroundColor = "transparent";
+      });
+
+      item.addEventListener("click", () => {
+        // Check if already selected
+        const alreadySelected = report.ecology.selectedSpecies.some((s) => s.id === species.id);
+        if (alreadySelected) {
+          alert(`${species.commonName} is already in your selected species list.`);
+          return;
+        }
+
+        report.ecology.selectedSpecies.push(species);
+        queueSave();
+        renderSelectedSpecies();
+        searchInput.value = "";
+        groupFilter.value = "";
+        searchResults.style.display = "none";
+      });
+
+      searchResults.appendChild(item);
+    });
+  }
+
+  function renderSelectedSpecies() {
+    if (report.ecology.selectedSpecies.length === 0) {
+      selectedTable.innerHTML = '<p class="muted">No species selected yet. Use the search above to add species.</p>';
+      return;
+    }
+
+    // Group species by category
+    const groups = {};
+    report.ecology.selectedSpecies.forEach((species) => {
+      if (!groups[species.group]) {
+        groups[species.group] = [];
+      }
+      groups[species.group].push(species);
+    });
+
+    let html = "";
+
+    // Create tables for each group
+    Object.keys(groups)
+      .sort()
+      .forEach((groupName) => {
+        html += `<h5 style="margin-top: 1.5rem; margin-bottom: 0.5rem;">${groupName}s</h5>`;
+        html += '<table style="width: 100%; border-collapse: collapse; margin-bottom: 1rem;">';
+        html += `
+          <thead>
+            <tr style="background-color: #f0f0f0;">
+              <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Common Name</th>
+              <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Scientific Name</th>
+              <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Status</th>
+              <th style="padding: 8px; text-align: center; border: 1px solid #ddd; width: 80px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+        `;
+
+        groups[groupName].forEach((species) => {
+          const statusBadge = species.invasive
+            ? '<span style="color: #8c2f39; font-weight: bold;">Invasive</span>'
+            : `<span style="color: #2d5016;">${species.nativeStatus}</span>`;
+
+          html += `
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd;">${species.commonName}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;"><em>${species.scientificName}</em></td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${statusBadge}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">
+                <button class="remove-species" data-species-id="${species.id}" style="background: #8c2f39; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.85em;">Remove</button>
+              </td>
+            </tr>
+          `;
+        });
+
+        html += "</tbody></table>";
+      });
+
+    selectedTable.innerHTML = html;
+
+    // Attach remove handlers
+    selectedTable.querySelectorAll(".remove-species").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const speciesId = e.target.dataset.speciesId;
+        report.ecology.selectedSpecies = report.ecology.selectedSpecies.filter((s) => s.id !== speciesId);
+        queueSave();
+        renderSelectedSpecies();
+      });
+    });
+  }
+
+  searchInput.addEventListener("input", filterSpecies);
+  groupFilter.addEventListener("change", filterSpecies);
+
+  // Initial render
+  renderSelectedSpecies();
+}
+
 function setupServiceWorker() {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/service-worker.js").catch(() => {
@@ -531,6 +683,7 @@ function init() {
   setupChips();
   setupMap();
   setupPhotos();
+  setupSpeciesLibrary();
   setupReview();
   hydrateUI();
   showPanel("welcome");

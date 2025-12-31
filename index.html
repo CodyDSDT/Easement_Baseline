@@ -208,6 +208,32 @@
           <textarea id="wildlife" rows="3"></textarea>
         </label>
       </div>
+
+      <h3 style="margin-top: 2rem;">Species Library</h3>
+      <p class="muted">Search and select species observed on the property. Selected species will be included in the baseline report with scientific names and habitat notes.</p>
+
+      <div class="grid two-cols">
+        <label>Search Species
+          <input type="text" id="speciesSearch" placeholder="Type to search by common or scientific name..." />
+        </label>
+        <label>Filter by Group
+          <select id="speciesGroupFilter">
+            <option value="">All Groups</option>
+            <option value="Tree">Trees</option>
+            <option value="Shrub">Shrubs</option>
+            <option value="Grass">Grasses</option>
+            <option value="Forb">Forbs</option>
+            <option value="Bird">Birds</option>
+            <option value="Mammal">Mammals</option>
+            <option value="Invasive Plant">Invasive Plants</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="speciesSearchResults" style="margin-top: 1rem; max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; display: none;"></div>
+
+      <h4 style="margin-top: 2rem;">Selected Species</h4>
+      <div id="selectedSpeciesTable"></div>
     </section>
 
     <section class="card hidden" data-panel="photos">
@@ -273,6 +299,7 @@
     <div>Built from APPLICATION_DESCRIPTION.md requirements</div>
   </footer>
 
+  <script src="speciesLibrary.js"></script>
   <script src="pdfGenerator.js"></script>
   <script src="app.js"></script>
 </body>
