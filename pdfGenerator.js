@@ -429,6 +429,113 @@ async function generateBaselinePDF(reportData) {
   yPos += addText(reportData.ecology.wildlife, margin, yPos);
   yPos += 15;
 
+  // SPECIES TABLES
+  if (reportData.ecology.selectedSpecies && reportData.ecology.selectedSpecies.length > 0) {
+    checkPageBreak(20);
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text('Species Inventory', margin, yPos);
+    yPos += 10;
+
+    // Group species by category
+    const speciesGroups = {};
+    reportData.ecology.selectedSpecies.forEach((species) => {
+      if (!speciesGroups[species.group]) {
+        speciesGroups[species.group] = [];
+      }
+      speciesGroups[species.group].push(species);
+    });
+
+    // Define group order for consistent display
+    const groupOrder = ['Tree', 'Shrub', 'Grass', 'Forb', 'Bird', 'Mammal', 'Invasive Plant'];
+
+    groupOrder.forEach((groupName) => {
+      if (!speciesGroups[groupName]) return;
+
+      const species = speciesGroups[groupName];
+      checkPageBreak(30);
+
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text(`${groupName}s`, margin, yPos);
+      yPos += 10;
+
+      // Table headers
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'bold');
+      doc.text('Common Name', margin, yPos);
+      doc.text('Scientific Name', margin + 60, yPos);
+      doc.text('Status', margin + 120, yPos);
+      yPos += 5;
+
+      // Draw header line
+      doc.setLineWidth(0.5);
+      doc.line(margin, yPos, margin + 170, yPos);
+      yPos += 5;
+
+      // Table rows
+      doc.setFont(undefined, 'normal');
+      species.forEach((sp) => {
+        // Check if we need more space for this row
+        checkPageBreak(15);
+
+        doc.setFontSize(9);
+        doc.text(sp.commonName, margin, yPos);
+        doc.setFont(undefined, 'italic');
+        doc.text(sp.scientificName, margin + 60, yPos);
+        doc.setFont(undefined, 'normal');
+
+        if (sp.invasive) {
+          doc.setTextColor(140, 47, 57); // Red color for invasive
+          doc.text('INVASIVE', margin + 120, yPos);
+          doc.setTextColor(0, 0, 0); // Reset to black
+        } else {
+          doc.text(sp.nativeStatus, margin + 120, yPos);
+        }
+
+        yPos += 5;
+
+        // Add habitat notes if available
+        if (sp.habitatNotes) {
+          doc.setFontSize(8);
+          doc.setTextColor(100, 100, 100); // Gray color
+          const habitatLines = doc.splitTextToSize(sp.habitatNotes, 165);
+          habitatLines.forEach((line) => {
+            checkPageBreak(8);
+            doc.text(line, margin + 5, yPos);
+            yPos += 4;
+          });
+          doc.setTextColor(0, 0, 0); // Reset to black
+          yPos += 2;
+        }
+
+        // Add management notes for invasive species
+        if (sp.invasive && sp.managementNotes) {
+          doc.setFontSize(8);
+          doc.setTextColor(140, 47, 57); // Red color
+          doc.setFont(undefined, 'bold');
+          doc.text('Management: ', margin + 5, yPos);
+          doc.setFont(undefined, 'normal');
+          yPos += 4;
+          const mgmtLines = doc.splitTextToSize(sp.managementNotes, 165);
+          mgmtLines.forEach((line) => {
+            checkPageBreak(8);
+            doc.text(line, margin + 5, yPos);
+            yPos += 4;
+          });
+          doc.setTextColor(0, 0, 0); // Reset to black
+          yPos += 2;
+        }
+
+        yPos += 3; // Spacing between species
+      });
+
+      yPos += 10; // Spacing between groups
+    });
+
+    yPos += 5;
+  }
+
   // (Map section is optional and numbered separately if photos exist)
   const mapSectionNum = (reportData.photos && reportData.photos.length > 0) ? 'IV' : 'IV';
 
