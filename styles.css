@@ -177,7 +177,7 @@ button.danger:hover { background: #b71c1c; }
 .map-container-wrapper {
   display: flex;
   gap: 1.5rem;
-  height: 600px;
+  height: 600px; /* Explicit height is crucial */
 }
 
 .map-main {
@@ -188,10 +188,11 @@ button.danger:hover { background: #b71c1c; }
 
 .map-interface {
   flex: 1;
+  min-height: 400px; /* Force minimum height if flex fails */
   border: 1px solid var(--border);
   border-radius: 4px;
-  background: #eee;
-  z-index: 1; /* Ensure map is below attribute panel if they overlap on small screens */
+  background: #e5e5e5; /* Grey background while loading tiles */
+  z-index: 1;
 }
 
 .map-actions {
@@ -221,6 +222,26 @@ button.danger:hover { background: #b71c1c; }
   display: flex;
   gap: 0.5rem;
   margin-top: 1rem;
+}
+
+/* Leaflet Custom Controls */
+.leaflet-control-locate {
+  background: white;
+  padding: 5px;
+  cursor: pointer;
+  border: 2px solid rgba(0,0,0,0.2);
+  border-radius: 4px;
+  background-clip: padding-box;
+}
+.leaflet-control-locate:hover { background: #f4f4f4; }
+.leaflet-control-locate-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+  display: block;
+  width: 30px; 
+  height: 30px;
+  text-align: center;
+  line-height: 30px;
 }
 
 /* Data Table */

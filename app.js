@@ -280,10 +280,69 @@ function setupMap() {
       openAttributePanel('new');
   });
 
-  // 6. Load Existing Features
+  // 6. Add Geocoder (Search) Control
+  if (L.Control.Geocoder) {
+    L.Control.geocoder({
+      defaultMarkGeocode: false
+    })
+    .on('markgeocode', function(e) {
+      const bbox = e.geocode.bbox;
+      const poly = L.polygon([
+        bbox.getSouthEast(),
+        bbox.getNorthEast(),
+        bbox.getNorthWest(),
+        bbox.getSouthWest()
+      ]);
+      map.fitBounds(poly.getBounds());
+    })
+    .addTo(map);
+  }
+
+  // 7. Add Custom "Locate Me" Control
+  const LocateControl = L.Control.extend({
+    options: { position: 'topleft' },
+    onAdd: function(map) {
+      const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-locate');
+      container.title = "Show my location";
+      
+      const icon = L.DomUtil.create('span', 'leaflet-control-locate-icon', container);
+      icon.innerHTML = '📍'; 
+      icon.style.cursor = 'pointer';
+
+      container.onclick = function() {
+        if (!navigator.geolocation) {
+          alert("Geolocation is not supported by this browser.");
+          return;
+        }
+        container.style.backgroundColor = '#ddd'; // Visual feedback
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const { latitude, longitude } = pos.coords;
+            const accuracy = pos.coords.accuracy;
+            map.flyTo([latitude, longitude], 16);
+            
+            // Optional: Show accuracy circle
+            L.circle([latitude, longitude], { radius: accuracy, color: '#136AEC', weight: 1, fillOpacity: 0.1 }).addTo(map);
+            L.circleMarker([latitude, longitude], { radius: 6, color: 'white', fillColor: '#136AEC', fillOpacity: 1 }).addTo(map);
+            
+            container.style.backgroundColor = 'white';
+          },
+          (err) => {
+            alert(`Location error: ${err.message}`);
+            container.style.backgroundColor = 'white';
+          },
+          { enableHighAccuracy: true }
+        );
+      };
+      return container;
+    }
+  });
+  map.addControl(new LocateControl());
+
+  // 8. Load Existing Features
   loadMapFeatures();
 
-  // 7. Save map position on move
+  // 9. Save map position on move
   map.on('moveend', () => {
     report.mapping.center = [map.getCenter().lat, map.getCenter().lng];
     report.mapping.zoom = map.getZoom();
