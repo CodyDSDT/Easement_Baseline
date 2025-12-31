@@ -149,9 +149,12 @@ function showPanel(step) {
   
   // Invalidate map size when showing the map panel to ensure it renders correctly
   if (step === 'mapping' && map) {
+    // Immediate call
+    map.invalidateSize();
+    // Delayed call to handle transition animations
     setTimeout(() => {
       map.invalidateSize();
-    }, 100);
+    }, 200);
   }
 }
 
@@ -806,6 +809,7 @@ function hydrateUI() {
 }
 
 function init() {
+  console.log("Conservation Easement Baseline App v1.1.0 Initializing...");
   setupStepper();
   setupWelcome();
   setupBindings();
