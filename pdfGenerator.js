@@ -20,14 +20,31 @@ async function generateBaselinePDF(reportData) {
     return false;
   };
 
-  // Helper to add text with wrapping
-  const addText = (text, x, y, maxWidth = 170) => {
-    const lines = doc.splitTextToSize(text || 'Not specified', maxWidth);
-    lines.forEach((line, index) => {
-      checkPageBreak();
-      doc.text(line, x, y + (index * lineHeight));
+  // Helper to add text with wrapping - now properly handles yPos during page breaks
+  const addText = (text, x = margin, maxWidth = 170) => {
+    if (!text || text.trim() === '') {
+      text = 'Not specified';
+    }
+
+    const lines = doc.splitTextToSize(text, maxWidth);
+
+    // Check if we have enough space for at least the first 3 lines
+    // This prevents starting a paragraph at the bottom of a page
+    const estimatedHeight = Math.min(lines.length, 3) * lineHeight;
+    if (yPos + estimatedHeight > pageHeight - margin) {
+      doc.addPage();
+      yPos = 20;
+    }
+
+    // Now render each line, properly tracking yPos
+    lines.forEach((line) => {
+      if (yPos + lineHeight > pageHeight - margin) {
+        doc.addPage();
+        yPos = 20;
+      }
+      doc.text(line, x, yPos);
+      yPos += lineHeight;
     });
-    return lines.length * lineHeight;
   };
 
   // ========== TITLE PAGE ==========
@@ -89,7 +106,7 @@ async function generateBaselinePDF(reportData) {
 
 3. In accordance with Treasury Regulation Section 1.170A-14(g)(5)(i), Grantor and INLC hereby acknowledge, declare, and agree that they have reviewed the information contained in the Baseline Report and that the Baseline Report provides an accurate representation of the condition of the Conservation Values to be protected by this Conservation Easement at the time of the transfer.`;
 
-  yPos += addText(acknowledgementText, margin, yPos);
+  addText(acknowledgementText);
   yPos += 20;
 
   // Signature blocks
@@ -154,7 +171,7 @@ async function generateBaselinePDF(reportData) {
   yPos += 7;
   doc.setFontSize(10);
   doc.setFont(undefined, 'normal');
-  yPos += addText(reportData.background.conservationValues, margin, yPos);
+  addText(reportData.background.conservationValues);
   yPos += 10;
 
   // Key Conservation Values (if any selected)
@@ -185,9 +202,9 @@ async function generateBaselinePDF(reportData) {
   yPos += 7;
   doc.setFont(undefined, 'normal');
   const prohibitedIntro = 'Any activity on or use of the Protected Property must be consistent with the Conservation Purposes of this Grant and Easement. Without limiting the generality of the foregoing, the following activities and uses are expressly prohibited:';
-  yPos += addText(prohibitedIntro, margin, yPos);
+  addText(prohibitedIntro);
   yPos += 5;
-  yPos += addText(reportData.background.prohibitedUses, margin, yPos);
+  addText(reportData.background.prohibitedUses);
   yPos += 10;
 
   checkPageBreak();
@@ -201,9 +218,9 @@ async function generateBaselinePDF(reportData) {
   yPos += 7;
   doc.setFont(undefined, 'normal');
   const permittedIntro = 'Grantor hereby reserves the right to make the following uses of the Protected Property:';
-  yPos += addText(permittedIntro, margin, yPos);
+  addText(permittedIntro);
   yPos += 5;
-  yPos += addText(reportData.background.permittedUses, margin, yPos);
+  addText(reportData.background.permittedUses);
   yPos += 10;
 
   checkPageBreak();
@@ -214,7 +231,7 @@ async function generateBaselinePDF(reportData) {
   doc.setFontSize(10);
   doc.setFont(undefined, 'normal');
   if (reportData.background.existingEasements) {
-    yPos += addText(reportData.background.existingEasements, margin, yPos);
+    addText(reportData.background.existingEasements);
   } else {
     doc.text('There are no known pre-existing easements or restrictions associated with this Property.', margin, yPos);
     yPos += 7;
@@ -235,7 +252,7 @@ async function generateBaselinePDF(reportData) {
   yPos += 7;
   doc.setFontSize(10);
   doc.setFont(undefined, 'normal');
-  yPos += addText(reportData.description.generalDescription, margin, yPos);
+  addText(reportData.description.generalDescription);
   yPos += 10;
 
   checkPageBreak();
@@ -259,7 +276,7 @@ async function generateBaselinePDF(reportData) {
   yPos += 7;
   doc.setFontSize(10);
   doc.setFont(undefined, 'normal');
-  yPos += addText(reportData.description.legalDescription, margin, yPos);
+  addText(reportData.description.legalDescription);
   yPos += 10;
 
   // Location and Access
@@ -293,7 +310,7 @@ async function generateBaselinePDF(reportData) {
       doc.text('Driving Directions:', margin, yPos);
       yPos += 7;
       doc.setFont(undefined, 'normal');
-      yPos += addText(reportData.description.directions, margin, yPos);
+      addText(reportData.description.directions);
     }
     yPos += 10;
   }
@@ -305,7 +322,7 @@ async function generateBaselinePDF(reportData) {
   yPos += 7;
   doc.setFontSize(10);
   doc.setFont(undefined, 'normal');
-  yPos += addText(reportData.description.elevation, margin, yPos);
+  addText(reportData.description.elevation);
   yPos += 10;
 
   if (reportData.description.history) {
@@ -316,7 +333,7 @@ async function generateBaselinePDF(reportData) {
     yPos += 7;
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
-    yPos += addText(reportData.description.history, margin, yPos);
+    addText(reportData.description.history);
     yPos += 10;
   }
 
@@ -327,7 +344,7 @@ async function generateBaselinePDF(reportData) {
   yPos += 7;
   doc.setFontSize(10);
   doc.setFont(undefined, 'normal');
-  yPos += addText(reportData.description.landUse, margin, yPos);
+  addText(reportData.description.landUse);
   yPos += 10;
 
   if (reportData.description.humanFeatures) {
@@ -338,7 +355,7 @@ async function generateBaselinePDF(reportData) {
     yPos += 7;
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
-    yPos += addText(reportData.description.humanFeatures, margin, yPos);
+    addText(reportData.description.humanFeatures);
     yPos += 10;
   }
 
@@ -350,7 +367,7 @@ async function generateBaselinePDF(reportData) {
     yPos += 7;
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
-    yPos += addText(reportData.description.publicBenefit, margin, yPos);
+    addText(reportData.description.publicBenefit);
     yPos += 15;
   }
 
@@ -370,7 +387,7 @@ async function generateBaselinePDF(reportData) {
   yPos += 7;
   doc.setFontSize(10);
   doc.setFont(undefined, 'normal');
-  yPos += addText(reportData.ecology.soils, margin, yPos);
+  addText(reportData.ecology.soils);
   yPos += 10;
 
   checkPageBreak();
@@ -380,7 +397,7 @@ async function generateBaselinePDF(reportData) {
   yPos += 7;
   doc.setFontSize(10);
   doc.setFont(undefined, 'normal');
-  yPos += addText(reportData.ecology.water, margin, yPos);
+  addText(reportData.ecology.water);
   yPos += 10;
 
   if (reportData.ecology.geology) {
@@ -391,7 +408,7 @@ async function generateBaselinePDF(reportData) {
     yPos += 7;
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
-    yPos += addText(reportData.ecology.geology, margin, yPos);
+    addText(reportData.ecology.geology);
     yPos += 10;
   }
 
@@ -402,7 +419,7 @@ async function generateBaselinePDF(reportData) {
   yPos += 7;
   doc.setFontSize(10);
   doc.setFont(undefined, 'normal');
-  yPos += addText(reportData.ecology.resilience, margin, yPos);
+  addText(reportData.ecology.resilience);
   yPos += 10;
 
   checkPageBreak();
@@ -416,7 +433,7 @@ async function generateBaselinePDF(reportData) {
   yPos += 7;
   doc.setFontSize(10);
   doc.setFont(undefined, 'normal');
-  yPos += addText(reportData.ecology.vegetation, margin, yPos);
+  addText(reportData.ecology.vegetation);
   yPos += 10;
 
   checkPageBreak();
@@ -426,7 +443,7 @@ async function generateBaselinePDF(reportData) {
   yPos += 7;
   doc.setFontSize(10);
   doc.setFont(undefined, 'normal');
-  yPos += addText(reportData.ecology.wildlife, margin, yPos);
+  addText(reportData.ecology.wildlife);
   yPos += 15;
 
   // SPECIES TABLES
@@ -539,37 +556,36 @@ async function generateBaselinePDF(reportData) {
   // (Map section is optional and numbered separately if photos exist)
   const mapSectionNum = (reportData.photos && reportData.photos.length > 0) ? 'IV' : 'IV';
 
-  if (reportData.mapping && ((reportData.mapping.shapes && reportData.mapping.shapes.length > 0) || (reportData.mapping.snapshots && reportData.mapping.snapshots.length > 0))) {
+  if (reportData.mapping && reportData.mapping.features && reportData.mapping.features.length > 0) {
     checkPageBreak(20);
     doc.setFontSize(16);
     doc.setFont(undefined, 'bold');
     doc.text(`${mapSectionNum}. Map & Boundaries`, margin, yPos);
     yPos += 10;
 
-    if (reportData.mapping.shapes && reportData.mapping.shapes.length > 0) {
-      doc.setFontSize(10);
-      doc.setFont(undefined, 'normal');
-      doc.text(`Total shapes drawn: ${reportData.mapping.shapes.length}`, margin, yPos);
-      yPos += 7;
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Total features drawn: ${reportData.mapping.features.length}`, margin, yPos);
+    yPos += 7;
 
-      const polygons = reportData.mapping.shapes.filter(s => s.type === 'polygon').length;
-      const polylines = reportData.mapping.shapes.filter(s => s.type === 'polyline').length;
-      const markers = reportData.mapping.shapes.filter(s => s.type === 'marker').length;
+    // Count feature types from GeoJSON geometry types
+    const polygons = reportData.mapping.features.filter(f => f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon').length;
+    const polylines = reportData.mapping.features.filter(f => f.geometry.type === 'LineString' || f.geometry.type === 'MultiLineString').length;
+    const markers = reportData.mapping.features.filter(f => f.geometry.type === 'Point').length;
 
-      if (polygons > 0) {
-        doc.text(`• ${polygons} polygon(s) (boundaries/areas)`, margin + 5, yPos);
-        yPos += 6;
-      }
-      if (polylines > 0) {
-        doc.text(`• ${polylines} polyline(s) (trails/paths)`, margin + 5, yPos);
-        yPos += 6;
-      }
-      if (markers > 0) {
-        doc.text(`• ${markers} marker(s) (points of interest)`, margin + 5, yPos);
-        yPos += 6;
-      }
-      yPos += 10;
+    if (polygons > 0) {
+      doc.text(`• ${polygons} polygon(s) (boundaries/areas)`, margin + 5, yPos);
+      yPos += 6;
     }
+    if (polylines > 0) {
+      doc.text(`• ${polylines} polyline(s) (trails/paths)`, margin + 5, yPos);
+      yPos += 6;
+    }
+    if (markers > 0) {
+      doc.text(`• ${markers} marker(s) (points of interest)`, margin + 5, yPos);
+      yPos += 6;
+    }
+    yPos += 10;
 
     // Try to add the map canvas image if available
     try {

@@ -233,11 +233,13 @@ function setupMap() {
   // 2. Add Base Layers
   const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      attribution: '© OpenStreetMap'
+      attribution: '© OpenStreetMap',
+      crossOrigin: 'anonymous'
   });
 
   const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      attribution: 'Tiles &copy; Esri'
+      attribution: 'Tiles &copy; Esri',
+      crossOrigin: 'anonymous'
   });
 
   // Default to satellite for field work
@@ -648,11 +650,76 @@ function downloadGeojson() {
   URL.revokeObjectURL(url);
 }
 
+function captureMapAsCanvas() {
+  return new Promise((resolve, reject) => {
+    if (!map || !window.leafletImage) {
+      reject(new Error('Map or leaflet-image library not available'));
+      return;
+    }
+
+    try {
+      // Use leaflet-image to capture the map
+      leafletImage(map, function(err, canvas) {
+        if (err) {
+          console.error('Error capturing map:', err);
+          // Check if it's a CORS error
+          if (err.message && err.message.includes('canvas')) {
+            reject(new Error('CORS_ERROR'));
+          } else {
+            reject(err);
+          }
+          return;
+        }
+
+        // Validate canvas dimensions
+        if (!canvas || canvas.width === 0 || canvas.height === 0) {
+          console.error('Invalid canvas dimensions:', canvas ? `${canvas.width}x${canvas.height}` : 'null');
+          reject(new Error('CORS_ERROR'));
+          return;
+        }
+
+        // Set the canvas ID so PDF generator can find it
+        canvas.id = 'mapCanvas';
+
+        // Hide it from view
+        canvas.style.display = 'none';
+
+        // Remove any existing mapCanvas
+        const existingCanvas = document.getElementById('mapCanvas');
+        if (existingCanvas) {
+          existingCanvas.remove();
+        }
+
+        // Add to DOM
+        document.body.appendChild(canvas);
+
+        console.log('Canvas created successfully:', canvas.width, 'x', canvas.height);
+        resolve(canvas);
+      });
+    } catch (error) {
+      console.error('Exception while capturing map:', error);
+      reject(error);
+    }
+  });
+}
+
 function downloadMapSnapshot() {
-  // Leaflet-image or html2canvas is typically needed for this.
-  // For this prototype, we'll try basic html2canvas on the map container
-  // Note: This might have issues with cross-origin tiles (CORS).
-  alert("Map snapshot functionality requires additional library setup for CORS handling. Please use system screenshot for now.");
+  captureMapAsCanvas()
+    .then((canvas) => {
+      // Convert canvas to downloadable image
+      canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${report.meta.reportName || 'baseline'}-map-${Date.now()}.png`;
+        link.click();
+        URL.revokeObjectURL(url);
+      });
+    })
+    .catch((error) => {
+      console.error('Error creating map snapshot:', error);
+      alert('Error creating map snapshot. Please try using a system screenshot instead.');
+    });
 }
 
 // ----------------------------------------------------------------------------
@@ -742,8 +809,42 @@ function updateSummary() {
 function setupReview() {
   document.getElementById("generatePdf").addEventListener("click", async () => {
     try {
+      // First, capture the map if it exists and has features
+      console.log('PDF generation started. Features:', report.mapping.features.length);
+
+      let mapCaptured = false;
+      if (map && report.mapping.features.length > 0) {
+        console.log('Attempting to capture map with', report.mapping.features.length, 'features');
+        try {
+          const canvas = await captureMapAsCanvas();
+          console.log('Map captured successfully! Canvas size:', canvas.width, 'x', canvas.height);
+          mapCaptured = true;
+        } catch (mapError) {
+          console.warn('Could not capture map:', mapError.message);
+          if (mapError.message === 'CORS_ERROR') {
+            console.warn('CORS issue with map tiles - PDF will include feature data but not map visualization');
+            console.warn('Tip: Take a screenshot of the map and add it as a photo for the PDF');
+          }
+        }
+      } else {
+        console.log('Skipping map capture - no features to show');
+      }
+
+      // Generate the PDF
       const filename = await generateBaselinePDF(report);
-      alert(`PDF generated successfully: ${filename}`);
+
+      let message = `PDF generated successfully: ${filename}`;
+      if (report.mapping.features.length > 0 && !mapCaptured) {
+        message += '\n\nNote: Map visualization could not be captured due to tile server restrictions. The PDF includes your feature data and coordinates. You can take a screenshot of the map and add it as a photo for visual reference.';
+      }
+      alert(message);
+
+      // Clean up the canvas
+      const canvas = document.getElementById('mapCanvas');
+      if (canvas) {
+        console.log('Cleaning up map canvas');
+        canvas.remove();
+      }
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Error generating PDF. Please check the console for details.');
@@ -927,7 +1028,7 @@ function hydrateUI() {
 }
 
 function init() {
-  console.log("Conservation Easement Baseline App v1.1.1 Initializing...");
+  console.log("Conservation Easement Baseline App v1.1.5 Initializing...");
   setupStepper();
   setupWelcome();
   setupBindings();
