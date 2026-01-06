@@ -7,6 +7,7 @@ import EcologicalFeatures from './components/EcologicalFeatures'
 import PhotoGallery from './components/PhotoGallery'
 import ReviewAndExport from './components/ReviewAndExport'
 import { loadReport, saveReport } from './utils/storage'
+import { APP_VERSION } from './version'
 
 function App() {
   const [currentStep, setCurrentStep] = useState(0)
@@ -71,6 +72,7 @@ function App() {
       <header className="app-header">
         <h1>Conservation Easement Baseline Report</h1>
         <p className="subtitle">Inland Northwest Land Conservancy</p>
+        <p className="version">Version {APP_VERSION}</p>
       </header>
 
       <nav className="progress-nav">

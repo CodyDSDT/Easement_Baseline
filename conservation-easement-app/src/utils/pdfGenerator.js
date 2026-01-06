@@ -20,13 +20,22 @@ export const generatePDF = async (reportData) => {
   }
 
   // Helper to add text with wrapping
-  const addText = (text, x, y, maxWidth = 170) => {
+  const addText = (text, x, maxWidth = 170) => {
     const lines = doc.splitTextToSize(text || 'Not specified', maxWidth)
+    const totalHeight = lines.length * lineHeight
+
+    // Check if we need a new page before adding text
+    if (yPos + totalHeight > pageHeight - margin) {
+      doc.addPage()
+      yPos = margin
+    }
+
     lines.forEach((line, index) => {
-      checkPageBreak()
-      doc.text(line, x, y + (index * lineHeight))
+      doc.text(line, x, yPos)
+      yPos += lineHeight
     })
-    return lines.length * lineHeight
+
+    return totalHeight
   }
 
   // Title Page
@@ -70,7 +79,7 @@ export const generatePDF = async (reportData) => {
   yPos += 7
   doc.setFontSize(10)
   doc.setFont(undefined, 'normal')
-  yPos += addText(backgroundInfo.conservationValues, margin, yPos)
+  addText(backgroundInfo.conservationValues, margin)
   yPos += 10
 
   checkPageBreak()
@@ -80,7 +89,7 @@ export const generatePDF = async (reportData) => {
   yPos += 7
   doc.setFontSize(10)
   doc.setFont(undefined, 'normal')
-  yPos += addText(backgroundInfo.prohibitedUses, margin, yPos)
+  addText(backgroundInfo.prohibitedUses, margin)
   yPos += 10
 
   checkPageBreak()
@@ -90,7 +99,7 @@ export const generatePDF = async (reportData) => {
   yPos += 7
   doc.setFontSize(10)
   doc.setFont(undefined, 'normal')
-  yPos += addText(backgroundInfo.permittedUses, margin, yPos)
+  addText(backgroundInfo.permittedUses, margin)
   yPos += 15
 
   // II. Property Description
@@ -105,7 +114,7 @@ export const generatePDF = async (reportData) => {
   yPos += 7
   doc.setFontSize(10)
   doc.setFont(undefined, 'normal')
-  yPos += addText(propertyDescription.generalDescription, margin, yPos)
+  addText(propertyDescription.generalDescription, margin)
   yPos += 10
 
   checkPageBreak()
@@ -127,7 +136,7 @@ export const generatePDF = async (reportData) => {
   yPos += 7
   doc.setFontSize(10)
   doc.setFont(undefined, 'normal')
-  yPos += addText(propertyDescription.legalDescription, margin, yPos)
+  addText(propertyDescription.legalDescription, margin)
   yPos += 10
 
   checkPageBreak()
@@ -137,7 +146,7 @@ export const generatePDF = async (reportData) => {
   yPos += 7
   doc.setFontSize(10)
   doc.setFont(undefined, 'normal')
-  yPos += addText(propertyDescription.elevation, margin, yPos)
+  addText(propertyDescription.elevation, margin)
   yPos += 10
 
   checkPageBreak()
@@ -147,7 +156,7 @@ export const generatePDF = async (reportData) => {
   yPos += 7
   doc.setFontSize(10)
   doc.setFont(undefined, 'normal')
-  yPos += addText(propertyDescription.currentLandUse, margin, yPos)
+  addText(propertyDescription.currentLandUse, margin)
   yPos += 15
 
   // III. Ecological Features
@@ -166,7 +175,7 @@ export const generatePDF = async (reportData) => {
   yPos += 7
   doc.setFontSize(10)
   doc.setFont(undefined, 'normal')
-  yPos += addText(ecologicalFeatures.soils, margin, yPos)
+  addText(ecologicalFeatures.soils, margin)
   yPos += 10
 
   checkPageBreak()
@@ -176,7 +185,7 @@ export const generatePDF = async (reportData) => {
   yPos += 7
   doc.setFontSize(10)
   doc.setFont(undefined, 'normal')
-  yPos += addText(ecologicalFeatures.waterResources, margin, yPos)
+  addText(ecologicalFeatures.waterResources, margin)
   yPos += 10
 
   checkPageBreak()
@@ -186,7 +195,7 @@ export const generatePDF = async (reportData) => {
   yPos += 7
   doc.setFontSize(10)
   doc.setFont(undefined, 'normal')
-  yPos += addText(ecologicalFeatures.climateResilience, margin, yPos)
+  addText(ecologicalFeatures.climateResilience, margin)
   yPos += 10
 
   checkPageBreak()
@@ -200,7 +209,7 @@ export const generatePDF = async (reportData) => {
   yPos += 7
   doc.setFontSize(10)
   doc.setFont(undefined, 'normal')
-  yPos += addText(ecologicalFeatures.vegetationDescription, margin, yPos)
+  addText(ecologicalFeatures.vegetationDescription, margin)
   yPos += 10
 
   checkPageBreak()
@@ -210,7 +219,7 @@ export const generatePDF = async (reportData) => {
   yPos += 7
   doc.setFontSize(10)
   doc.setFont(undefined, 'normal')
-  yPos += addText(ecologicalFeatures.fishWildlifeSpecies, margin, yPos)
+  addText(ecologicalFeatures.fishWildlifeSpecies, margin)
   yPos += 15
 
   // Photo Section
